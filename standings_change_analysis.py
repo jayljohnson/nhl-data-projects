@@ -98,6 +98,7 @@ for season, teams in standings.items():
             result["points"] = points
             result["previous_season_points"] = previous_season.get(team, 0)
             result["change_in_points"] = points - previous_season.get(team, points)
+            result["place"] = place
             previous_season_place = previous_season_places.get(team, 0)
             result["previous_season_place"] = previous_season_place
             result["change_in_place"] = 0 if previous_season_place == 0 else (place - previous_season_place) * -1
