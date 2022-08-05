@@ -34,26 +34,48 @@ def get_conference_rank(current_standings):
             result[conference] = conference_rank
     return result
 
-def get_standings_rank_impact_games_percent(game_results, game_count_by_season):
+def get_standings_rank_impact_games_percent(game_results, game_count_by_season, level="league"):
+    if level == "league":
+        rank_field = "standings_rank_impact_game"
+    elif level == 'conference':
+        rank_field = "conference_standings_rank_impact_game"
+    else:
+        raise Exception(f"Invalid level: {level}")
+
     standings_rank_impact_games = defaultdict(lambda: 0)
-    for i, game in enumerate(game_results):
-        standings_rank_impact_games[game["season"]] += game["standings_rank_impact_game"]
-    print(dict(standings_rank_impact_games))
+    for game in game_results:
+        standings_rank_impact_games[game["season"]] += game[rank_field]
+    print(f"{level}-level standings change count:\n {dict(standings_rank_impact_games)}\n")
 
     standings_rank_impact_games_percent = defaultdict(lambda: 0)
     for season, count in game_count_by_season.items():
-        standings_rank_impact_games_percent[season] = standings_rank_impact_games[season] / count if count != 0 else None
+        standings_rank_impact_games_percent[season] = round(standings_rank_impact_games[season] / count * 100, 3) if count != 0 else None
 
-    print(dict(standings_rank_impact_games_percent))
+    print(f"{level}-level standings change percent:\n {dict(standings_rank_impact_games_percent)}\n")
 
 def get_team_info():
     with open(f'./teams_single.pkl', 'rb') as f:
         teams = pickle.load(f)
         # Atlanta Thrashers don't have the conference name from the teams API (team id=11)
         teams[11]["conference"]["name"] = "Eastern"
+        print("\n".join([f"{v['name']}, id: {v['id']}, conference: {v['conference'].get('name', 'n/a')}" for k, v in teams.items()]))
         return teams
 
 team_id_info = get_team_info()
+
+def get_game_stats(team_id_info, game_data, teams, home_or_away):
+    team = teams.get(home_or_away)
+
+    team_name = team["team"]["name"]
+    team_id = team["team"]["id"]
+    game_data[f"{home_or_away}_team_id"] = team_id
+    game_data[f"{home_or_away}_team"] = team_name
+    conference = team_id_info[game_data[f"{home_or_away}_team_id"]]["conference"].get("name")
+    game_data[f"{home_or_away}_conference"] = conference
+    team_goals = team["goals"]
+    game_data[f"{home_or_away}_goals"] = team_goals
+    game_data[f"{home_or_away}_shots_on_goal"] = team["shotsOnGoal"]
+    return team_id,conference,team_goals
 
 for season in seasons:
     game_count = 0
@@ -77,31 +99,9 @@ for season in seasons:
 
                 teams = game.get("teams")
 
-                home_team = teams.get("home")
+                home_team_id, home_conference, home_team_goals = get_game_stats(team_id_info, game_data, teams, home_or_away="home")
 
-                home_team_name = home_team["team"]["name"]
-                home_team_id = home_team["team"]["id"]
-                game_data["home_team_id"] = home_team_id
-                game_data["home_team"] = home_team_name
-                # Atlanta Thrashers conference not available from the teams api (id=11)
-                home_conference = team_id_info[game_data["home_team_id"]]["conference"].get("name")
-                game_data["home_conference"] = home_conference
-                home_team_goals = home_team["goals"]
-                game_data["home_goals"] = home_team_goals
-                game_data["home_shots_on_goal"] = home_team["shotsOnGoal"]
-
-                away_team = teams.get("away")
-
-                away_team_name = away_team["team"]["name"]
-                away_team_id = away_team["team"]["id"]
-                game_data["away_team_id"] = away_team_id
-                game_data["away_team"] = away_team_name
-                # Atlanta Thrashers conference not available from the teams api (id=11)
-                away_conference = team_id_info[game_data["away_team_id"]]["conference"].get("name")
-                game_data["away_conference"] = away_conference
-                away_team_goals = away_team["goals"]
-                game_data["away_goals"] = away_team_goals
-                game_data["away_shots_on_goal"] = away_team["shotsOnGoal"]
+                away_team_id, away_conference, away_team_goals = get_game_stats(team_id_info, game_data, teams, home_or_away="away")
 
                 # Calculate the points for standings
                 # Final period key: regulation = 3, overtime = 4, shootout = 5, cancelled = 0
@@ -150,18 +150,23 @@ for season in seasons:
 
                 home_current_rank = current_rank[home_team_id]
                 home_previous_standings_ranks =  previous_standings_ranks.get(home_team_id, home_current_rank)
+
+                game_data["**home league ranks**"] = "---> home league rank"
                 game_data["home_current_standings_rank"] = home_current_rank
                 game_data["home_previous_standings_rank"] = previous_standings_ranks.get(home_team_id, home_current_rank)
-                game_data["home_standings_rank_change"] = home_previous_standings_ranks - home_current_rank                
+                game_data["home_standings_rank_change"] = home_previous_standings_ranks - home_current_rank
 
                 away_current_rank = current_rank[away_team_id]
-                away_previous_standings_ranks =  previous_standings_ranks.get(away_team_id, away_current_rank)                
+                away_previous_standings_ranks =  previous_standings_ranks.get(away_team_id, away_current_rank)
+
+                game_data["**away league ranks**"] = "---> away league rank"
                 game_data["away_current_standings_rank"] = current_rank[away_team_id]
                 game_data["away_previous_standings_rank"] = previous_standings_ranks.get(away_team_id, away_current_rank)
                 game_data["away_standings_rank_change"] = away_previous_standings_ranks - away_current_rank
 
                 # Check if either team had a change in standings.  
                 # To show the frequency of standings changes throughout the season
+                game_data["**standings change**"] = "---> standings change"
                 game_data["standings_change_flag"] = 1 if game_data["home_standings_rank_change"] != 0 or game_data["away_standings_rank_change"] != 0 else 0
                 
                 # Check if the game resulted in the winning team overtaking the losing team in the standings
@@ -174,15 +179,13 @@ for season in seasons:
                     game_data["home_overtook_flag"], game_data["away_overtook_flag"] = (0,0)
                 game_data["standings_rank_impact_game"] = 1 if 1 in [game_data["home_overtook_flag"], game_data["away_overtook_flag"]] else 0
 
-                # TODO: Points behind next closest team in the standings, and points behind playoff spot
-                # Needs the sorted standings order values, and maybe awareness of ties
-
-                ### TODO: WIP for conference rank change
+                ### Conference standings
                 home_current_conference_rank = current_conference_rank[home_conference][home_team_id]
                 if previous_conference_ranks.get(home_conference):
                     home_previous_conference_rank = previous_conference_ranks[home_conference].get(home_team_id, 1)
                 else:
                     home_previous_conference_rank = home_current_conference_rank
+                game_data["**home conference_ranks**"] = "---> home conference rank"
                 game_data["home_current_conference_rank"] = home_current_conference_rank
                 game_data["home_previous_conference_rank"] = home_previous_conference_rank
                 game_data["home_conference_rank_change"] = home_previous_conference_rank - home_current_conference_rank                
@@ -192,12 +195,14 @@ for season in seasons:
                     away_previous_conference_rank = previous_conference_ranks[away_conference].get(away_team_id, 1)
                 else:
                     away_previous_conference_rank = away_current_conference_rank
+                game_data["**away conference_ranks**"] = "---> away conference rank"    
                 game_data["away_current_conference_rank"] = away_current_conference_rank
                 game_data["away_previous_conference_rank"] = away_previous_conference_rank
                 game_data["away_conference_rank_change"] = away_previous_conference_rank - away_current_conference_rank
 
                 # Check if either team had a change in standings.  
                 # To show the frequency of standings changes throughout the season
+                game_data["**conference standings change**"] = "---> conference standings change"
                 game_data["conference_standings_change_flag"] = 1 if game_data["home_conference_rank_change"] != 0 or game_data["away_conference_rank_change"] != 0 else 0
                 
                 # Check if the game resulted in the winning team overtaking the losing team in the standings
@@ -227,6 +232,8 @@ season_results = []
 for season, teams in standings.items():
     # The 2004-05 labor dispute resulted in the entire season being cancelled.  
     # In 2005, compare to the results from 2003 instead of 2004
+    # TODO: Compare Arizona Coyotes to Phoenix Coyotes (team move/rename from Phoenix)
+    # TODO: Compare Winnipeg Jets to Atlanta Thrashers (team move from Atlanta)
     previous_season_standings = standings.get(season - 1) if season != 2005 else standings.get(2003)
     previous_season_rank = rank.get(season - 1) if season != 2005 else standings.get(2003)
 
@@ -269,6 +276,9 @@ with open(f'./game_results.csv', 'w') as f:
         values = [str(x) for x in row.values()] 
         f.write(",".join(values) + "\n")
 
-print(f"\nTotal games processed:\n" + str(game_count_by_season))
+print(f"\nTotal games processed:\n" + str(game_count_by_season) + "\n")
 
-get_standings_rank_impact_games_percent(game_results, game_count_by_season)
+get_standings_rank_impact_games_percent(game_results, game_count_by_season, "league")
+
+# TODO: Separate breakdown of stats by conference?
+get_standings_rank_impact_games_percent(game_results, game_count_by_season, "conference")
