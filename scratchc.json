@@ -1,0 +1,116 @@
+{
+    1: {'franchiseId': 23, 'firstYearOfPlay': '1982'
+    },
+    2: {'franchiseId': 22, 'firstYearOfPlay': '1972'
+    },
+    3: {'franchiseId': 10, 'firstYearOfPlay': '1926'
+    },
+    4: {'franchiseId': 16, 'firstYearOfPlay': '1967'
+    },
+    5: {'franchiseId': 17, 'firstYearOfPlay': '1967'
+    },
+    6: {'franchiseId': 6, 'firstYearOfPlay': '1924'
+    },
+    7: {'franchiseId': 19, 'firstYearOfPlay': '1970'
+    },
+    8: {'franchiseId': 1, 'firstYearOfPlay': '1909'
+    },
+    9: {'franchiseId': 30, 'firstYearOfPlay': '1990'
+    },
+    10: {'franchiseId': 5, 'firstYearOfPlay': '1917'
+    },
+    11: {'franchiseId': 35, 'firstYearOfPlay': '1997'
+    },
+    12: {'franchiseId': 26, 'firstYearOfPlay': '1979'
+    },
+    13: {'franchiseId': 33, 'firstYearOfPlay': '1993'
+    },
+    14: {'franchiseId': 31, 'firstYearOfPlay': '1991'
+    },
+    15: {'franchiseId': 24, 'firstYearOfPlay': '1974'
+    },
+    16: {'franchiseId': 11, 'firstYearOfPlay': '1926'
+    },
+    17: {'franchiseId': 12, 'firstYearOfPlay': '1926'
+    },
+    18: {'franchiseId': 34, 'firstYearOfPlay': '1997'
+    },
+    19: {'franchiseId': 18, 'firstYearOfPlay': '1967'
+    },
+    20: {'franchiseId': 21, 'firstYearOfPlay': '1980'
+    },
+    21: {'franchiseId': 27, 'firstYearOfPlay': '1979'
+    },
+    22: {'franchiseId': 25, 'firstYearOfPlay': '1979'
+    },
+    23: {'franchiseId': 20, 'firstYearOfPlay': '1970'
+    },
+    24: {'franchiseId': 32, 'firstYearOfPlay': '1993'
+    },
+    25: {'franchiseId': 15, 'firstYearOfPlay': '1967'
+    },
+    26: {'franchiseId': 14, 'firstYearOfPlay': '1967'
+    },
+    28: {'franchiseId': 29, 'firstYearOfPlay': '1990'
+    },
+    29: {'franchiseId': 36, 'firstYearOfPlay': '1997'
+    },
+    30: {'franchiseId': 37, 'firstYearOfPlay': '1997'
+    },
+    31: {'franchiseId': 15, 'firstYearOfPlay': 0
+    },
+    32: {'franchiseId': 27, 'firstYearOfPlay': 0
+    },
+    33: {'franchiseId': 28, 'firstYearOfPlay': 0
+    },
+    34: {'franchiseId': 26, 'firstYearOfPlay': 0
+    },
+    35: {'franchiseId': 23, 'firstYearOfPlay': 0
+    },
+    36: {'franchiseId': 3, 'firstYearOfPlay': 0
+    },
+    37: {'franchiseId': 4, 'firstYearOfPlay': 0
+    },
+    38: {'franchiseId': 9, 'firstYearOfPlay': 0
+    },
+    39: {'franchiseId': 9, 'firstYearOfPlay': 0
+    },
+    40: {'franchiseId': 12, 'firstYearOfPlay': 0
+    },
+    41: {'franchiseId': 2, 'firstYearOfPlay': 0
+    },
+    42: {'franchiseId': 4, 'firstYearOfPlay': 0
+    },
+    43: {'franchiseId': 7, 'firstYearOfPlay': 0
+    },
+    44: {'franchiseId': 8, 'firstYearOfPlay': 0
+    },
+    45: {'franchiseId': 3, 'firstYearOfPlay': 0
+    },
+    46: {'franchiseId': 13, 'firstYearOfPlay': 0
+    },
+    47: {'franchiseId': 21, 'firstYearOfPlay': 0
+    },
+    48: {'franchiseId': 23, 'firstYearOfPlay': 0
+    },
+    49: {'franchiseId': 13, 'firstYearOfPlay': 0
+    },
+    50: {'franchiseId': 12, 'firstYearOfPlay': 0
+    },
+    51: {'franchiseId': 8, 'firstYearOfPlay': 0
+    },
+    52: {'franchiseId': 35, 'firstYearOfPlay': '2011'
+    },
+    53: {'franchiseId': 28, 'firstYearOfPlay': '1979'
+    },
+    54: {'franchiseId': 38, 'firstYearOfPlay': '2016'
+    },
+    55: {'franchiseId': 39, 'firstYearOfPlay': '2021'
+    },
+    56: {'franchiseId': 13, 'firstYearOfPlay': 0
+    },
+    57: {'franchiseId': 5, 'firstYearOfPlay': 0
+    },
+    58: {'franchiseId': 5, 'firstYearOfPlay': 0
+    }
+}

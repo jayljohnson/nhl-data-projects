@@ -2,12 +2,12 @@ import requests
 import pickle
 
 
-with open('./teams.pkl', 'wb') as f:
+with open('data/teams/teams.pkl', 'wb') as f:
     endpoint = "https://statsapi.web.nhl.com/api/v1/teams"
     result = requests.get(url=endpoint).json()
     pickle.dump(result, f, pickle.HIGHEST_PROTOCOL)
 
-with open('./teams_single.pkl', 'wb') as f:
+with open('data/teams/teams_single.pkl', 'wb') as f:
     team_ids = range(1,200)
     results = {}
     for id in team_ids:

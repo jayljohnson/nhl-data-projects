@@ -29,3 +29,19 @@ Compare each team's standings to the previous season, and calculate the change i
 * Kyle Pastor for the inspiration to fetch and analyze data from the NHL API's: https://towardsdatascience.com/nhl-analytics-with-python-6390c5d3206d
 * Drew Hynes for documenting the NHL data API's here: https://gitlab.com/dword4/nhlapi/-/tree/master
 * Thanks to the NHL for making the data available.  All data returned by the API is owned and copyrighted by the NHL and it includes the notice: "NHL and the NHL Shield are registered trademarks of the National Hockey League. NHL and NHL team marks are the property of the NHL and its teams. © NHL 2022. All Rights Reserved."
+
+"""
+# Ideas:
+
+## Current dataset
+* Distance from home city and away city
+* Consecutive home/away games
+
+## Needs new datasets
+* Ice time by forward line pairings, top 3 pairings
+* Blocked shots
+* Goalie pulled at game end
+
+## General learning
+* What is CORSI, how is it calculated?
+"""

@@ -22,5 +22,5 @@ for season in seasons:
             print(game_data)
             season_data.append(game_data)
 
-    with open(f'./{season}-{game_endpoint_subtype}.pkl', 'wb') as f:
+    with open(f'data/linescore/{season}-{game_endpoint_subtype}.pkl', 'wb') as f:
         pickle.dump(season_data, f, pickle.HIGHEST_PROTOCOL)
