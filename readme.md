@@ -17,7 +17,7 @@ Compare each team's standings to the previous season, and calculate the change i
 * team: The team name
 * points: The number of points from regulation games
 * previous_season_points: The number of points from the previous seasons
-* change_in_points: The change in points from the previous steason
+* change_in_points: The change in points from the previous season
 * place: The final position in the standings
 * previous_season_place: The final position in the standings from the previous season
 * change_in_place: How many positions the team moved up (positive) or down (negative) compared to the previous season

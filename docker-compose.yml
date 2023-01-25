@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  application:
+    build: .
+    volumes:
+      - ./:/home
+      - $HOME/.cache/pip-docker/:/root/.cache/pip
+    command: tail -F /dev/null
+    env_file: env-local.env
+    environment:
+      - ENVIRONMENT_STAGE=local

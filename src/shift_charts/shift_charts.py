@@ -1,0 +1,10 @@
+from ..utils import utils
+
+DATASET_NAME = "shift-charts"
+RAW_FILE_PATH = f"{utils.DATA_FILE_PATH_RAW}/{DATASET_NAME}"
+OUTPUT_FILE_PATH = f"{utils.DATA_FILE_PATH_OUTPUT}/{DATASET_NAME}"
+
+utils.make_data_file_paths([RAW_FILE_PATH, OUTPUT_FILE_PATH])
+
+OUTPUT_FILENAME = f"{OUTPUT_FILE_PATH}/{DATASET_NAME}.csv"
+FILE_PATH_ALL_KEYS = f"{OUTPUT_FILE_PATH}/{DATASET_NAME}-all-keys.pkl"
