@@ -13,14 +13,13 @@ load_db:
 		data/outputs/sqlite/nhl.db
 
 transform_feed_live:
-	time python -m src.feed_live.transform_feed_live_to_csv.py
+	time python -m src.feed_live.transform_feed_live_to_csv
 
 transform_feed_live_rosters:
-	time python -m src.feed_live.transform_feed_live_rosters_to_csv.py
+	time python -m src.feed_live.transform_feed_live_rosters_to_csv
 
 transform_shift_charts:
-	time python -m src.shift_charts.transform_shift_charts_to_csv.py
-	# time python src/shift_charts/transform_shift_charts_to_csv.py
+	time python -m src.shift_charts.transform_shift_charts_to_csv
 
 datasette:
 	datasette data/outputs/sqlite/nhl.db --setting sql_time_limit_ms 20000
