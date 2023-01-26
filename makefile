@@ -12,6 +12,7 @@ load_db:
 		data/outputs/analysis/season_results.csv \
 		data/outputs/sqlite/nhl.db
 
+
 transform_feed_live:
 	time python -m src.feed_live.transform_feed_live_to_csv
 
