@@ -2,9 +2,11 @@
 FROM  python:3-alpine
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+
 WORKDIR /home
-COPY .. /home/
+COPY ./requirements.txt /home/requirements.txt
 RUN pip3 install -r requirements.txt
+COPY .. /home/
 
 RUN apk add --no-cache bash
 RUN apk add --no-cache sqlite
