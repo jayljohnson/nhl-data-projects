@@ -22,7 +22,10 @@ def write_pickle_file(file_path, data):
         pickle.dump(data, f, protocol=4)
 
 def json_normalize_new(data):
-    return flatten(data) 
+    return flatten(data)
+
+def json_to_csv(data):
+    return data
     
     # return pd.json_normalize(data)
 

@@ -6,7 +6,7 @@ import json
 import pandas as pd
 
 
-game_id = "2021020892"
+game_id = "2021020891"
 
 feed_live = get_feed_live(game_id)
 shift_data = get_shifts(game_id)

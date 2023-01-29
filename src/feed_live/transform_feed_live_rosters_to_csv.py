@@ -1,6 +1,6 @@
 import json
 from os import listdir
-import pandas as pd
+# import pandas as pd
 from ..utils import utils
 from ..feed_live import feed_live as fl
 
@@ -37,7 +37,7 @@ with open(OUTPUT_FILE_GAME_SUMMARY, 'a') as f_game_summary:
                 print(f"Skipping file {file} because game_state is: `{game_state}`")
                 continue
 
-            f_game_summary.write(pd.json_normalize(game_data).to_csv(index=False, header=is_first_file))
+            f_game_summary.write(utils.json_normalize_new(game_data).to_csv(index=False, header=is_first_file))
 
             players_reformatted = list(dict())
             for opponent_type in ["home", "away"]:
@@ -56,6 +56,7 @@ with open(OUTPUT_FILE_GAME_SUMMARY, 'a') as f_game_summary:
 
                 data_short["teams"][opponent_type]["players"] = players_reformatted
 
-            f_game_roster.write(pd.json_normalize(players_reformatted).to_csv(index=False, header=is_first_file))
+            # TODO: How to convert the normalized json to csv?
+            f_game_roster.write(utils.json_normalize_new(players_reformatted).to_csv(index=False, header=is_first_file))
 
             is_first_file = False
