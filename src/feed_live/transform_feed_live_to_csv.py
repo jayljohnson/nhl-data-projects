@@ -28,7 +28,9 @@ def get_feed_live(filename):
         result = pickle.load(f)
         return result
 
-filename_list_feed_live = sorted(listdir(fl.RAW_FILE_PATH))
+def get_filename_list():
+    filename_list_feed_live = sorted(listdir(fl.RAW_FILE_PATH))
+    return filename_list_feed_live
 
 def get_distinct_keys():
     """
@@ -42,6 +44,7 @@ def get_distinct_keys():
             all_keys = sorted(pickle.load(f))
     else:
         all_keys = set()
+        filename_list_feed_live = get_filename_list()
         for i, game_file in enumerate(filename_list_feed_live):
             print(f"at {game_file}, file number: {i}")
             feed_live_data = get_feed_live(f"{fl.RAW_FILE_PATH}/{game_file}")
@@ -59,31 +62,16 @@ def get_distinct_keys():
             pickle.dump(all_keys_sorted, f, protocol=4)
     return all_keys
 
-def write_csv():
+def to_csv(count, game_file, feed_live_game_live):
+    output_filename=fl.OUTPUT_FILENAME
     # Get the superset of all attribute names across all files
     all_keys = get_distinct_keys()
 
-    # Delete existing file before loading data
-    if exists(fl.OUTPUT_FILENAME):
-        if utils.confirm_prompt(
-            f"Do you want to replace the existing csv file `{fl.OUTPUT_FILENAME}`?  This may take a while.."):
-            remove(fl.OUTPUT_FILENAME)
-        else:
-            print("Aborting...")
-            exit()
+    with open(output_filename, 'a') as f:
+        # print(f"Destination file: {output_filename}")
 
-    count = 0
-    file_count = len(filename_list_feed_live)
-    for i, game_file in enumerate(filename_list_feed_live):
-        print(f"Processing {i} of {file_count} files")
-        feed_live = get_feed_live(f"{fl.RAW_FILE_PATH}/{game_file}")
-
-        feed_live_game_live = feed_live["liveData"]["plays"]["allPlays"]
-
-        with open(fl.OUTPUT_FILENAME, 'a') as f:
-
-            season = get_game_year_from_filename(game_file)
-            game_id = get_game_id_from_filename(game_file)
+        season = get_game_year_from_filename(game_file)
+        game_id = get_game_id_from_filename(game_file)
 
             # extra_attributes = {
             #     "season": season,
@@ -94,22 +82,45 @@ def write_csv():
             # extra_attribute_values = ",".join(extra_attributes.values())
 
             # Flattening logic for keys that don't exist in a file
-            for row in feed_live_game_live:
-                row_flat = flatten(row)
-                if count == 0:
-                    header = "season,gameId," + ",".join(all_keys) + "\n"  # TODO: Better handling for extra file-level vars
-                    f.write(header)
-                    count += 1
-                row_str = f"\"{season}\",\"{game_id}\","  # TODO: Better handling for extra file-level vars
-                column_count = 0
-                for row_key in all_keys:
-                    col_str = "\"" + str(row_flat.get(row_key, "")).replace("\"", "'") +"\""  # Cleanup to replace double quotes in the data with single quotes
-                    if column_count == 0:
-                        row_str += col_str
-                    else:
-                        row_str += "," + col_str
-                    column_count += 1
-                f.write(row_str + "\n")
-            f.close()
+        for row in feed_live_game_live:
+            row_flat = flatten(row)
+            if count == 0:
+                header = "season,gameId," + ",".join(all_keys) + "\n"  # TODO: Better handling for extra file-level vars
+                f.write(header)
+                count += 1
+            row_str = f"\"{season}\",\"{game_id}\","  # TODO: Better handling for extra file-level vars
+            column_count = 0
+            for row_key in all_keys:
+                col_str = "\"" + str(row_flat.get(row_key, "")).replace("\"", "'") +"\""  # Cleanup to replace double quotes in the data with single quotes
+                if column_count == 0:
+                    row_str += col_str
+                else:
+                    row_str += "," + col_str
+                column_count += 1
+            f.write(row_str + "\n")
+        f.close()
+
+def write_csv():  
+    # Delete existing file before loading data
+    if exists(fl.OUTPUT_FILENAME):
+        if utils.confirm_prompt(
+            f"Do you want to replace the existing csv file `{fl.OUTPUT_FILENAME}`?  This may take a while.."):
+            remove(fl.OUTPUT_FILENAME)
+        else:
+            print("Aborting...")
+            exit()
+
+    count = 0
+    filename_list_feed_live = get_filename_list()
+    file_count = len(filename_list_feed_live)
+    for i, game_file in enumerate(filename_list_feed_live):
+        print(f"Processing {i} of {file_count} files")
+        source_path = f"{fl.RAW_FILE_PATH}/{game_file}"
+        feed_live = get_feed_live(source_path)
+        # print(f"Source file: {source_path}")
+
+        feed_live_game_live = feed_live["liveData"]["plays"]["allPlays"]
+
+        to_csv(count, game_file, feed_live_game_live)
 
 write_csv()

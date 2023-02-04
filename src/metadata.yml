@@ -1,0 +1,41 @@
+nhl_data_projects:
+  - feed_live:
+      - feed_live:
+          description: Constants file.  TODO- Rename file to constants.py
+      - get_feed_live:
+          description:  http api requests, saved to a pickle file for each game
+      - transform_feed_live_to_csv:
+          description: Gets the 'feed live' pickle files and transforms them to flattened csv
+          benchmark_time: '12:24.19'
+      - transform_feed_live_rosters_to_csv:
+          description: TODO
+  - linescore:
+      - get_linescores:
+          description: Gets the 'feed live' pickle files and transforms them to flattened csv.
+  - players:
+      - get_players:
+          description: TODO
+  - shift_charts:
+      - analyze_shifts:
+          description: TODO
+      - get_shift_charts:
+          description: TODO
+      - shift_charts:
+          description: TODO
+      - transform_shift_charts_to_csv:
+          description: TODO
+  - teams:
+      - get_teams:
+          description: TODO
+
+
+# Testing in progress
+1. 
+
+
+
+# Known to be working
+
+
+
+# Has issue

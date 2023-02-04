@@ -12,13 +12,13 @@ load_db: up
 		data/outputs/analysis/season_results.csv \
 		data/outputs/sqlite/nhl.db"
 
-load_db_2:
+load_db_feed_live:
 	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "mkdir -p data/outputs/sqlite && \
 	rm -f data/outputs/sqlite/nhl.db || true && \
 	pwd && \
 	csvs-to-sqlite \
-		data/outputs/shift-charts/shift-charts.csv \
-		data/outputs/sqlite/nhl.db"
+		data/outputs/feed-live/feed-live.csv \
+		data/outputs/sqlite/nhl-feed-live.db"
 
 
 transform_feed_live:
@@ -31,13 +31,13 @@ transform_shift_charts:
 	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.shift_charts.transform_shift_charts_to_csv"
 
 datasette:
-	datasette data/outputs/sqlite/nhl.db --setting sql_time_limit_ms 20000
+	datasette data/outputs/sqlite/nhl-feed-live.db --setting sql_time_limit_ms 20000
 
 CURRENT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 CURRENT_USER := ${USER}
 DOCKER_IMAGE_PREFIX := ${shell pwd | awk -F/ '{print $$NF}'}
 
-all: version
+# all: version
 
 version: up
 	@echo 'Base directory: ${DOCKER_IMAGE_PREFIX}'
@@ -78,3 +78,9 @@ permissions:
 	sudo groupadd docker
 	sudo usermod -aG docker ${USER}
 	sudo newgrp docker
+
+benchmark:
+	time head -c 10G < /dev/urandom > load_test_random.data
+	rm load_test_random.data
+	time head -c 10G < /dev/urandom > /var/local/load_test_random.data
+	rm load_test_random.data > /var/local/load_test_random.data
