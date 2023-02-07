@@ -13,5 +13,6 @@ COPY ./requirements.txt /usr/local/nhl-data-projects/requirements.txt
 RUN pip3 install -r requirements.txt
 
 COPY .. /usr/local/nhl-data-projects/
+# RUN datasette install datasette-publish-fly
 # EXPOSE 8001
 

@@ -5,9 +5,18 @@ load_db: up
 	rm -f data/outputs/sqlite/nhl.db || true && \
 	csvs-to-sqlite \
 		data/outputs/feed-live/feed-live.csv \
-		data/outputs/feed-live/game-roster-feed-live.csv \
-		data/outputs/feed-live/game-summary-feed-live.csv \
-		data/outputs/shift-charts/shift-charts.csv \
+		data/outputs/analysis/game_results.csv \
+		data/outputs/analysis/season_results.csv \
+		data/outputs/sqlite/nhl.db"
+
+load_db_old: up
+	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "mkdir -p data/outputs/sqlite && \
+	rm -f data/outputs/sqlite/nhl.db || true && \
+	csvs-to-sqlite \
+		data/outputs/feed-live/feed-live.csv \
+		# data/outputs/feed-live/game-roster-feed-live.csv \
+		# data/outputs/feed-live/game-summary-feed-live.csv \
+		# data/outputs/shift-charts/shift-charts.csv \
 		data/outputs/analysis/game_results.csv \
 		data/outputs/analysis/season_results.csv \
 		data/outputs/sqlite/nhl.db"
@@ -20,6 +29,8 @@ load_db_feed_live:
 		data/outputs/feed-live/feed-live.csv \
 		data/outputs/sqlite/nhl-feed-live.db"
 
+get_feed_live:
+	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.feed_live.get_feed_live"
 
 transform_feed_live:
 	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.feed_live.transform_feed_live_to_csv"
@@ -32,6 +43,26 @@ transform_shift_charts:
 
 datasette:
 	datasette data/outputs/sqlite/nhl-feed-live.db --setting sql_time_limit_ms 20000
+
+fly_deploy:
+	datasette publish fly data/outputs/sqlite/nhl.db \
+		--app="nhl-data-projects" \
+		--create-volume 2 \
+		--volume-name vol1 \
+		--static vol1:data/outputs/test/ \
+		--install datasette-saved-queries \
+		--setting sql_time_limit_ms 25000
+		# --setting allow_download off  # TODO: Bugfix needed for bools
+
+fly_deploy_incremental:
+	# Placeholder
+
+fly_cli:
+	 	nhl-data-projects
+	# "pip install csvs-to-sqlite"
+
+fly_restart:
+	fly apps restart nhl-data-projects
 
 CURRENT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 CURRENT_USER := ${USER}

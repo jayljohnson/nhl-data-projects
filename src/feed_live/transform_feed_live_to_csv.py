@@ -1,5 +1,5 @@
 import pickle
-from os import listdir, remove
+from os import remove
 from os.path import exists
 from flatten_json import flatten
 from ..utils import utils
@@ -28,9 +28,6 @@ def get_feed_live(filename):
         result = pickle.load(f)
         return result
 
-def get_filename_list():
-    filename_list_feed_live = sorted(listdir(fl.RAW_FILE_PATH))
-    return filename_list_feed_live
 
 def get_distinct_keys():
     """
@@ -44,7 +41,7 @@ def get_distinct_keys():
             all_keys = sorted(pickle.load(f))
     else:
         all_keys = set()
-        filename_list_feed_live = get_filename_list()
+        filename_list_feed_live = utils.get_filename_list()
         for i, game_file in enumerate(filename_list_feed_live):
             print(f"at {game_file}, file number: {i}")
             feed_live_data = get_feed_live(f"{fl.RAW_FILE_PATH}/{game_file}")
@@ -111,7 +108,7 @@ def write_csv():
             exit()
 
     count = 0
-    filename_list_feed_live = get_filename_list()
+    filename_list_feed_live = utils.get_filename_list()
     file_count = len(filename_list_feed_live)
     for i, game_file in enumerate(filename_list_feed_live):
         print(f"Processing {i} of {file_count} files")
@@ -122,5 +119,6 @@ def write_csv():
         feed_live_game_live = feed_live["liveData"]["plays"]["allPlays"]
 
         to_csv(count, game_file, feed_live_game_live)
+        count += 1
 
 write_csv()

@@ -1,9 +1,10 @@
 import pickle
 import requests
 import typing
-from os import remove, makedirs
+from os import remove, makedirs, listdir
 from os.path import exists, dirname
 from flatten_json import flatten
+
 
 DATA_FILE_PATH_RAW = "data/raw"
 DATA_FILE_PATH_OUTPUT = "data/outputs"
@@ -62,6 +63,11 @@ def remove_files(file_paths: typing.List[str]):
     for path in file_paths:
         if exists(path):
             remove(path)
+
+
+def get_filename_list(filepath):
+    result = sorted(listdir(filepath))
+    return result
 
 
 def call_endpoint(endpoint):
