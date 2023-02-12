@@ -12,7 +12,7 @@ from ..feed_live import feed_live as fl
 
 # OUTPUT_FILENAME = f"{OUTPUT_FILE_PATH}/{DATASET_NAME}.csv"
 
-
+# TODO: This data should be queryable from sqlite; try parsing required values using a db view
 def get_game_year_from_filename(filename):
     return filename.split("/")[-1][0:4]
 

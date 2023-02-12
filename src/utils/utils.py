@@ -1,6 +1,7 @@
 import pickle
 import requests
 import typing
+import datetime
 from os import remove, makedirs, listdir
 from os.path import exists, dirname
 from flatten_json import flatten
@@ -8,6 +9,11 @@ from flatten_json import flatten
 
 DATA_FILE_PATH_RAW = "data/raw"
 DATA_FILE_PATH_OUTPUT = "data/outputs"
+
+
+def get_current_year():
+    return datetime.date.today().year
+
 
 def open_pickle_file(file_path):
     with open(file_path, 'rb') as f:
