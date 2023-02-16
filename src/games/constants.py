@@ -1,4 +1,4 @@
-from ..utils import utils
+from src.utils import utils
 
 DATASET_NAME = "feed-live"
 RAW_FILE_PATH = f"{utils.DATA_FILE_PATH_RAW}/{DATASET_NAME}"

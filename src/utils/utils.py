@@ -1,11 +1,13 @@
-import pickle
-import requests
 import typing
 import datetime
 from os import remove, makedirs, listdir
 from os.path import exists, dirname
-from flatten_json import flatten
+import pickle
 
+from requests_cache import CachedSession
+from flatten_json import flatten
+# from pysqlite2 import dbapi2 as sqlite3
+import sqlite3
 
 DATA_FILE_PATH_RAW = "data/raw"
 DATA_FILE_PATH_OUTPUT = "data/outputs"
@@ -28,13 +30,17 @@ def write_pickle_file(file_path, data):
     with open(file_path, 'wb') as f:
         pickle.dump(data, f, protocol=4)
 
+
 def json_normalize_new(data):
     return flatten(data)
 
+
 def json_to_csv(data):
     return data
-    
+
+
     # return pd.json_normalize(data)
+
 
 def write_object_to_csv(file_path, data, print_header: bool, f = None):
     file_path_dir = dirname(file_path)
@@ -76,7 +82,39 @@ def get_filename_list(filepath):
     return result
 
 
-def call_endpoint(endpoint):
-    response = requests.get(url=endpoint)
+def get_session():
+    session = CachedSession(
+        'data/raw/http_cache',
+        backend='sqlite',
+        serializer='json',
+        decode_content=True
+    )
+    return session
+
+
+def call_endpoint(endpoint, invalidate_cache=False, ttl_seconds=None):
+    # TODO: Should be able to write raw json when this is implemented using the decode_content option
+    #  https://github.com/requests-cache/requests-cache/issues/631
+    session = get_session()
+    if invalidate_cache and not ttl_seconds:
+        print("Expiring cache")
+        response = session.get(url=endpoint, headers={'Cache-Control': 'no-cache'}, expire_after=0)
+    elif invalidate_cache and ttl_seconds:
+        raise RuntimeError(
+            f"invalidate_cache or ttl_seconds are incompatible with each other.  "
+            f"Pick one or the other and retry."
+        )
+    elif ttl_seconds:
+        print(f"Setting cache ttl to {ttl_seconds} seconds")
+        response = session.get(url=endpoint, expire_after=ttl_seconds)
+    else:
+        print("Setting cache to never expire")
+        response = session.get(url=endpoint, expire_after=-1)
     status_code = response.status_code
+    print(f"response from_cache: {response.from_cache}, status_code = {status_code}")
     return response.json(), status_code
+
+
+def get_db_connection(db_file_path):
+    print(f"Opening sqlite db file at {db_file_path}")
+    return sqlite3.connect(db_file_path)

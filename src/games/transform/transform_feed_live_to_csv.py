@@ -2,9 +2,9 @@ import pickle
 from os import remove
 from os.path import exists
 from flatten_json import flatten
-from ..utils import utils
-from ..feed_live import feed_live as fl
-
+from src.utils import utils
+from .. import constants as fl
+from ..extract.feed_live_games import GameFeedLive
 
 # DATASET_NAME = "feed-live"
 # RAW_FILE_PATH = f"{utils.DATA_FILE_PATH_RAW}/{DATASET_NAME}"
@@ -12,15 +12,22 @@ from ..feed_live import feed_live as fl
 
 # OUTPUT_FILENAME = f"{OUTPUT_FILE_PATH}/{DATASET_NAME}.csv"
 
+
 # TODO: This data should be queryable from sqlite; try parsing required values using a db view
 def get_game_year_from_filename(filename):
     return filename.split("/")[-1][0:4]
+
 
 def get_game_id_from_filename(filename):
     game_id = filename.split("/")[-1][15:25]
     return game_id
 
-def get_feed_live(filename):
+
+def get_feed_live(game_id):
+    return GameFeedLive(game_id=game_id).get()
+
+
+def get_feed_live_old(filename):
     # year = get_game_year_from_filename(filename)
     # game_id = get_game_id_from_filename(filename)
     # filename = f"{RAW_FILE_PATH}/{year}-{DATASET_NAME}-{game_id}.pkl"
@@ -58,6 +65,7 @@ def get_distinct_keys():
         with open(fl.FILE_PATH_ALL_KEYS, 'wb') as f:
             pickle.dump(all_keys_sorted, f, protocol=4)
     return all_keys
+
 
 def to_csv(count, game_file, feed_live_game_live):
     output_filename=fl.OUTPUT_FILENAME
@@ -97,6 +105,7 @@ def to_csv(count, game_file, feed_live_game_live):
             f.write(row_str + "\n")
         f.close()
 
+
 def write_csv():  
     # Delete existing file before loading data
     if exists(fl.OUTPUT_FILENAME):
@@ -116,7 +125,7 @@ def write_csv():
         feed_live = get_feed_live(source_path)
         # print(f"Source file: {source_path}")
 
-        feed_live_game_live = feed_live["liveData"]["plays"]["allPlays"]
+        feed_live_game_live = c
 
         to_csv(count, game_file, feed_live_game_live)
         count += 1

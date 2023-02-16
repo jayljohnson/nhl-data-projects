@@ -31,11 +31,11 @@ load_db_feed_live:
 
 ### GAMES ###
 get_games:
-	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.games.get_games"
+	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.games.extract.season_games"
 
 ### FEED LIVE ###
 get_feed_live:
-	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.feed_live.get_feed_live"
+	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.games.extract.feed_live_games"
 
 transform_feed_live:
 	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.feed_live.transform_feed_live_to_csv"
