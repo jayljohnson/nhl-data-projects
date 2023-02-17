@@ -8,6 +8,9 @@ from requests_cache import CachedSession
 from flatten_json import flatten
 # from pysqlite2 import dbapi2 as sqlite3
 import sqlite3
+import logging
+
+logging.basicConfig(level='INFO')
 
 DATA_FILE_PATH_RAW = "data/raw"
 DATA_FILE_PATH_OUTPUT = "data/outputs"
@@ -37,9 +40,6 @@ def json_normalize_new(data):
 
 def json_to_csv(data):
     return data
-
-
-    # return pd.json_normalize(data)
 
 
 def write_object_to_csv(file_path, data, print_header: bool, f = None):
@@ -97,24 +97,38 @@ def call_endpoint(endpoint, invalidate_cache=False, ttl_seconds=None):
     #  https://github.com/requests-cache/requests-cache/issues/631
     session = get_session()
     if invalidate_cache and not ttl_seconds:
-        print("Expiring cache")
-        response = session.get(url=endpoint, headers={'Cache-Control': 'no-cache'}, expire_after=0)
+        logging.info(f"Setting cache to expire immediately for endpoint: {endpoint}")
+        response = session.get(
+            url=endpoint,
+            headers={'Cache-Control': 'no-cache'},
+            expire_after=0
+        )
+        # TODO: Cleanup the  is_cache_hit logic- it is probably not needed
+        is_cache_hit = False
     elif invalidate_cache and ttl_seconds:
         raise RuntimeError(
             f"invalidate_cache or ttl_seconds are incompatible with each other.  "
             f"Pick one or the other and retry."
         )
     elif ttl_seconds:
-        print(f"Setting cache ttl to {ttl_seconds} seconds")
-        response = session.get(url=endpoint, expire_after=ttl_seconds)
+        logging.info(f"Setting cache ttl to {ttl_seconds} seconds for endpoint {endpoint}")
+        response = session.get(
+            url=endpoint,
+            expire_after=ttl_seconds
+        )
+        is_cache_hit = False
     else:
-        print("Setting cache to never expire")
-        response = session.get(url=endpoint, expire_after=-1)
+        logging.info(f"Setting cache to never expire for endpoint {endpoint}")
+        response = session.get(
+            url=endpoint,
+            expire_after=-1
+        )
+        is_cache_hit = True
     status_code = response.status_code
-    print(f"response from_cache: {response.from_cache}, status_code = {status_code}")
-    return response.json(), status_code
+    logging.debug(f"response from_cache: {response.from_cache}, status_code = {status_code}")
+    return response.json(), status_code, is_cache_hit
 
 
 def get_db_connection(db_file_path):
-    print(f"Opening sqlite db file at {db_file_path}")
+    logging.debug(f"Opening sqlite db file at {db_file_path}")
     return sqlite3.connect(db_file_path)

@@ -1,8 +1,8 @@
 import pickle
 from os.path import exists
+import json
 
 import typing
-import json
 from flatten_json import flatten
 
 from src.utils import utils
@@ -10,31 +10,35 @@ from .season_games import SeasonGames, get_latest_season
 from ..constants import RAW_FILE_PATH, OUTPUT_FILE_PATH, DATASET_NAME
 import logging
 
-logging.basicConfig(level='DEBUG')
-
 FULL_REFRESH = False
 
 
 class GameFeedLive:
-    def __init__(self, game_id):
+    # TODO: Pass in abstractGameState from the SeasonGames responses;
+    #  if state == 'Final' write to cache else expire immediately
+    def __init__(self, game_id, abstract_game_state_current = None):
         self.game_id = game_id
-        self.abstract_game_state = None
+        self.abstract_game_state = abstract_game_state_current
         self.data = None
+        self.is_cached = None
+        self.endpoint = None
 
     def get(self):
         game_endpoint = 'https://statsapi.web.nhl.com/api/v1/game'
         game_endpoint_subtype = 'feed/live'
-        endpoint = f"{game_endpoint}/{self.game_id}/{game_endpoint_subtype}"
+        self.endpoint = f"{game_endpoint}/{self.game_id}/{game_endpoint_subtype}"
 
-        print(f"Calling endpoint: {endpoint}")
-        self.data, status = utils.call_endpoint(endpoint)
+        logging.debug(f"Calling endpoint: {self.endpoint}")
+        # Games that are not final can change so those are pulled from the API without caching
+        # After a game reaches 'Final' status it is cached forever
+        if self.abstract_game_state == 'Final':
+            self.data, status, self.is_cached = utils.call_endpoint(self.endpoint)
+        else:
+            logging.info(f"Invalidating cache for game_id {self.game_id}, game_state {self.abstract_game_state}")
+            self.data, _, self.is_cached = utils.call_endpoint(self.endpoint, invalidate_cache=True)
         self.abstract_game_state = self.data["gameData"]["status"]["abstractGameState"]
-        print(f"Game status: {self.abstract_game_state}")
+        logging.debug(f"Game status: {self.abstract_game_state}")
 
-        # Games that are not final can change so those are pulled again from the API instead of the cache
-        # After a game reaches 'final' status it is always pulled from the cache and does not need to be invalidated
-        if self.abstract_game_state != 'Final':
-            self.data, status = utils.call_endpoint(endpoint, invalidate_cache=True)
         return self.data
 
 
@@ -47,30 +51,53 @@ def get_all_game_feed_lives(season_from=None, season_to=None):
     season_from = season_from or get_latest_season()
     season_to = season_to or get_latest_season()
     seasons = range(season_from, season_to + 1)
-    print(f"seasons: {seasons}")
+    logging.debug(f"seasons: {seasons}")
 
     for season in seasons:
-        print(f"Getting data for season {season}")
+        game_ids_with_season = get_game_ids_to_refresh(season)
+        logging.debug(f"at game_ids_to_refresh: {list(game_ids_with_season)}")
 
-        season_games_obj = SeasonGames(season)
-        season_games = season_games_obj.get()
-        if FULL_REFRESH:
-            game_ids_to_refresh = season_games
-        else:
-            game_ids_to_refresh = {
-                g: a for g, a in season_games_obj.get_game_ids_with_state().items() if a != 'Preview'
-            }
+        for game_info in game_ids_with_season:
+            game_data = get_data_for_single_game_id(game_info)
+            logging.debug(f"at game_data: {game_data}")
+            logging.debug(list(game_data))
+        logging.info(f"Done with season {season}")
 
-        for game_id, abstract_game_state in game_ids_to_refresh.items():
-            game_feed_live_obj = GameFeedLive(game_id=game_id)
-            game_feed_live_obj.get()
-            print(f"Game id is {game_id}; abstract_game_state is {game_feed_live_obj.abstract_game_state}")
 
-            all_keys = get_all_plays_keys(game_feed_live_obj.data)
-            write_to_db(season=season, game_id=game_id, all_keys=all_keys, game_feed_live=game_feed_live_obj.data)
+def get_game_ids_to_refresh(season):
+    logging.debug(f"Getting data for season {season}")
 
-            if game_feed_live_obj.abstract_game_state != abstract_game_state:
-                raise RuntimeError("State error")
+    season_games_obj = SeasonGames(season)
+    season_games_obj.get()
+    if FULL_REFRESH:
+        game_ids_to_refresh = season_games_obj.get_game_ids_with_state()
+    else:
+        game_ids_to_refresh = {
+            g: a for g, a in season_games_obj.get_game_ids_with_state().items() if a != 'Preview'
+        }
+
+    game_ids_with_season = [(g, a, season) for g, a in game_ids_to_refresh.items()]
+    return game_ids_with_season
+
+
+def get_data_for_single_game_id(game_ids_with_season):
+    game_id, abstract_game_state, season = game_ids_with_season
+    game_feed_live_obj = GameFeedLive(game_id=game_id, abstract_game_state_current=abstract_game_state)
+    game_feed_live_obj.get()
+    logging.debug(f"Game id is {game_id}; game_feed_live_obj.abstract_game_state is {game_feed_live_obj.abstract_game_state}")
+    logging.debug(f"Input abstract_game_state is: {abstract_game_state}")
+    all_keys = get_all_plays_keys(game_feed_live_obj.data)
+
+    if FULL_REFRESH or not game_feed_live_obj.is_cached:
+        # Games that had a cache miss don't exist in the db either; write them to the db
+        # Do the same for when FULL_REFRESH is True
+        logging.info(f"Writing {game_id} to database.")
+        write_to_db(season=season, game_id=game_id, all_keys=all_keys, game_feed_live=game_feed_live_obj.data)
+
+    else:
+        # Skip inserts for rows that were already cached.  These should have already been parsed and inserted.
+        logging.info(f"Game {game_id} is already in the db; skipping write")
+    return game_feed_live_obj.data
 
 
 def get_all_plays_keys(game_feed_live):
@@ -94,7 +121,6 @@ def get_all_plays_keys(game_feed_live):
     all_keys_sorted = sorted(all_keys)
 
     with open(file_path_all_keys, 'wb') as f:
-        # print(f"at all_keys_sorted: {all_keys_sorted}")
         pickle.dump(all_keys_sorted, f, protocol=4)
     return all_keys_sorted
 
@@ -108,74 +134,58 @@ def write_to_db(season, game_id, all_keys, game_feed_live: typing.Dict[str, typi
 
     sqlite_file_path = f"{RAW_FILE_PATH}-db/game_feed_live.db"
     connection = utils.get_db_connection(sqlite_file_path)
+    create_table_feed_live_games(all_keys, connection, default_columns)
 
     all_plays = game_feed_live["liveData"]["plays"]["allPlays"]
-    # print(f"all_plays type: {all_plays}")
+    logging.info(f"game_id: {game_id}, number of records in all_plays: {len(all_plays)}")
     if all_plays:
+        # all_plays_flattened_list = []
         cur = connection.cursor()
-        all_keys_with_default_columns = list(default_columns.keys()) + list(all_keys)
-
-        all_plays_flattened_list = []
         for row in all_plays:
-            # print(type(row))
             row.update(default_columns)
             row_flattened = flatten(row)
-            if len(row_flattened["coordinates"]) == 0:
+            if not row_flattened.get("coordinates") or row_flattened.get("coordinates") == '{}':
                 row_flattened["coordinates"] = None
-            result_dict = {k: row_flattened.get(k, None) for k in all_keys_with_default_columns}
-            # print(f"result_dict length: {len(result_dict)}")
-            all_plays_flattened_list.append(result_dict)
-        print(f"Number of records: {len(all_plays_flattened_list)}")
-        # print(json.dumps(all_plays_flattened_list, indent=4))
-        # all_plays_flattened.update(default_columns)
+            logging.debug(f"Number of records: {len(row_flattened)}")
+            logging.debug(f"all_plays_flattened_list: {json.dumps(row_flattened, indent=4)}")
 
-        # flattened_output = flatten(result_dict)
-        # print(f"Number of records: {flattened_output}")
-        # if len(flattened_output["coordinates"]) == 0:
-        #     flattened_output["coordinates"] = None
-
-        # print(flattened_output)
-
-        create_table_columns = ",\n".join([x.replace('\'', '') for x in all_keys_with_default_columns])
-        create_table_sql = f"create table if not exists feed_live_games({create_table_columns})"
-        # print(f"create table sql: {create_table_sql}")
-        cur.execute(create_table_sql)
-
-        # TODO: This is not safe from injection attacks - simplify
-
-        insert_placeholder_strings = ", ".join([f":{x}" for x in all_keys_with_default_columns])
-        query = f"INSERT INTO feed_live_games VALUES({insert_placeholder_strings})"
-        # print(query)
-
-        # query = "insert into feed_live_games " + \
-        #         str(tuple(flattened_output.keys())).replace('\'', '') + " values" + \
-        #         str(tuple(flattened_output.values())).replace('None', 'NULL') + ";"
-        cur.executemany(query, all_plays_flattened_list)
-        # cur.executemany(
-        #     "INSERT INTO feed_live_games VALUES(%s)", flattened_output.values()
-        # )
+            insert_colname_strings = ", ".join([f"{x}" for x in row_flattened.keys()])
+            insert_placeholder_strings = ", ".join([f":{x}" for x in row_flattened.keys()])
+            logging.debug(f"row_flattened length: {len(row_flattened)}")
+            query = f"""
+                INSERT OR REPLACE INTO feed_live_games
+                ({insert_colname_strings})
+                VALUES({insert_placeholder_strings})
+            """
+            cur.execute(query, row_flattened)
         connection.commit()
         cur.close()
     else:
         cur = connection.cursor()
-        print("No data; inserting placeholder")
+        logging.debug("No data; inserting placeholder")
         sql = "insert into feed_live_games (season, game_id) VALUES (?, ?)"
         cur.execute(sql, (season, game_id))
         connection.commit()
         cur.close()
-        print(f"all_keys: {all_keys}")
-        print("all_plays: " + str(game_feed_live["liveData"]["plays"].keys()))
+        logging.debug(f"all_keys: {all_keys}")
+        logging.debug("all_plays: " + str(game_feed_live["liveData"]["plays"].keys()))
         # raise Exception("Unhandled insert")
+    cur.close()
 
-    # print("**** NO DATA ****")
+
+def create_table_feed_live_games(all_keys, connection, default_columns):
+    all_keys_with_default_columns = list(default_columns.keys()) + list(all_keys)
+    create_table_columns = ",\n".join([x.replace('\'', '') for x in all_keys_with_default_columns])
+    create_table_sql = f"""
+        create table if not exists feed_live_games({create_table_columns},
+                                                   PRIMARY KEY(season, game_id, about_eventId))
+    """
+    cur = connection.cursor()
+    cur.execute(create_table_sql)
 
 
 if __name__ == "__main__":
-    get_all_game_feed_lives(season_from=1917)
-
-
-
-
+    get_all_game_feed_lives(season_from=2022)
 
 # def db_init(connection):
 #     if init_db:

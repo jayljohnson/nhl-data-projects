@@ -1,8 +1,6 @@
 from src.utils import utils
 import logging
 
-logging.basicConfig(level='INFO')
-
 """
 TODO list
 ---------
@@ -54,13 +52,13 @@ class SeasonGames:
 
     def get(self):
         season_year_end = self.season + 1
-        print(f"Getting game info for season `{self.season}-{season_year_end}`")
+        logging.debug(f"Getting game info for season `{self.season}-{season_year_end}`")
         endpoint = f"https://statsapi.web.nhl.com/api/v1/schedule?season={self.season}{season_year_end}"
         if invalidate_cache or self.is_current_season:
-            response, status_code = utils.call_endpoint(endpoint, invalidate_cache=True)
+            response, status_code, _ = utils.call_endpoint(endpoint, invalidate_cache=True)
         else:
-            response, status_code = utils.call_endpoint(endpoint)
-        print(f"get games api status_code for season {self.season} is: {status_code}")
+            response, status_code, _ = utils.call_endpoint(endpoint)
+        logging.debug(f"get games api status_code for season {self.season} is: {status_code}")
         self.data = response
         return self.data
 
@@ -72,8 +70,7 @@ class SeasonGames:
                 abstract_game_state = games["status"]["abstractGameState"]
                 result[game_id] = abstract_game_state
         self.map_game_id__state = result
-        print(type(result))
-        print(f"Number of games for season = {len(result)}")
+        logging.debug(f"Number of games for season = {len(result)}")
         return self.map_game_id__state
 
 
@@ -86,10 +83,10 @@ def get_all_games():
 
 def get_latest_season():
     endpoint = "https://statsapi.web.nhl.com/api/v1/seasons/current"
-    response, status_code = utils.call_endpoint(endpoint=endpoint, ttl_seconds=60*60*24)
+    response, status_code, _ = utils.call_endpoint(endpoint=endpoint, ttl_seconds=60*60*24)
     latest_season = response.get('seasons')[0]
     latest_season_id = latest_season.get('seasonId')
-    print(f"Latest seasonId: {latest_season_id}")
+    logging.debug(f"Latest seasonId: {latest_season_id}")
     return int(latest_season_id[0:4])
 
 
