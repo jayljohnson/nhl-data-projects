@@ -1,3 +1,4 @@
+import asyncio
 import typing
 import datetime
 from os import remove, makedirs, listdir
@@ -103,8 +104,6 @@ def call_endpoint(endpoint, invalidate_cache=False, ttl_seconds=None):
             headers={'Cache-Control': 'no-cache'},
             expire_after=0
         )
-        # TODO: Cleanup the  is_cache_hit logic- it is probably not needed
-        is_cache_hit = False
     elif invalidate_cache and ttl_seconds:
         raise RuntimeError(
             f"invalidate_cache or ttl_seconds are incompatible with each other.  "
@@ -116,17 +115,15 @@ def call_endpoint(endpoint, invalidate_cache=False, ttl_seconds=None):
             url=endpoint,
             expire_after=ttl_seconds
         )
-        is_cache_hit = False
     else:
         logging.info(f"Setting cache to never expire for endpoint {endpoint}")
         response = session.get(
             url=endpoint,
             expire_after=-1
         )
-        is_cache_hit = True
     status_code = response.status_code
     logging.debug(f"response from_cache: {response.from_cache}, status_code = {status_code}")
-    return response.json(), status_code, is_cache_hit
+    return response.json(), status_code, response.from_cache
 
 
 def get_db_connection(db_file_path):

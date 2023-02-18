@@ -11,6 +11,8 @@ from ..constants import RAW_FILE_PATH, OUTPUT_FILE_PATH, DATASET_NAME
 import logging
 
 FULL_REFRESH = False
+SQLITE_FILE_PATH = f"{RAW_FILE_PATH}-db/game_feed_live.db"
+CALL_COUNT = 0
 
 
 class GameFeedLive:
@@ -69,15 +71,14 @@ def get_game_ids_to_refresh(season):
 
     season_games_obj = SeasonGames(season)
     season_games_obj.get()
-    if FULL_REFRESH:
-        game_ids_to_refresh = season_games_obj.get_game_ids_with_state()
-    else:
-        game_ids_to_refresh = {
-            g: a for g, a in season_games_obj.get_game_ids_with_state().items() if a != 'Preview'
-        }
+    game_ids_to_refresh = season_games_obj.get_game_ids_with_state()
 
-    game_ids_with_season = [(g, a, season) for g, a in game_ids_to_refresh.items()]
-    return game_ids_with_season
+    if not FULL_REFRESH:
+        game_ids_to_refresh = [
+            (g, v[0], v[1]) for g, v in game_ids_to_refresh.items() if v[0] != 'Preview'
+        ]
+
+    return game_ids_to_refresh
 
 
 def get_data_for_single_game_id(game_ids_with_season):
@@ -86,14 +87,21 @@ def get_data_for_single_game_id(game_ids_with_season):
     game_feed_live_obj.get()
     logging.debug(f"Game id is {game_id}; game_feed_live_obj.abstract_game_state is {game_feed_live_obj.abstract_game_state}")
     logging.debug(f"Input abstract_game_state is: {abstract_game_state}")
+
     all_keys = get_all_plays_keys(game_feed_live_obj.data)
+    default_columns = get_default_columns(game_id, season)
+    logging.info(f"Game is cached: {game_feed_live_obj.is_cached}")
+
+    global CALL_COUNT
+    if CALL_COUNT == 0:
+        create_table_feed_live_games(all_keys=all_keys, default_columns=default_columns)
+        CALL_COUNT += 1
 
     if FULL_REFRESH or not game_feed_live_obj.is_cached:
         # Games that had a cache miss don't exist in the db either; write them to the db
         # Do the same for when FULL_REFRESH is True
         logging.info(f"Writing {game_id} to database.")
         write_to_db(season=season, game_id=game_id, all_keys=all_keys, game_feed_live=game_feed_live_obj.data)
-
     else:
         # Skip inserts for rows that were already cached.  These should have already been parsed and inserted.
         logging.info(f"Game {game_id} is already in the db; skipping write")
@@ -127,20 +135,14 @@ def get_all_plays_keys(game_feed_live):
 
 def write_to_db(season, game_id, all_keys, game_feed_live: typing.Dict[str, typing.Any]):
 
-    default_columns = {
-        "season": season,
-        "game_id": game_id
-    }
+    default_columns = get_default_columns(game_id, season)
 
-    sqlite_file_path = f"{RAW_FILE_PATH}-db/game_feed_live.db"
-    connection = utils.get_db_connection(sqlite_file_path)
-    create_table_feed_live_games(all_keys, connection, default_columns)
-
+    connection = utils.get_db_connection(SQLITE_FILE_PATH)
+    cur = connection.cursor()
+    cur.execute("BEGIN")
     all_plays = game_feed_live["liveData"]["plays"]["allPlays"]
     logging.info(f"game_id: {game_id}, number of records in all_plays: {len(all_plays)}")
     if all_plays:
-        # all_plays_flattened_list = []
-        cur = connection.cursor()
         for row in all_plays:
             row.update(default_columns)
             row_flattened = flatten(row)
@@ -158,34 +160,50 @@ def write_to_db(season, game_id, all_keys, game_feed_live: typing.Dict[str, typi
                 VALUES({insert_placeholder_strings})
             """
             cur.execute(query, row_flattened)
-        connection.commit()
-        cur.close()
     else:
-        cur = connection.cursor()
         logging.debug("No data; inserting placeholder")
         sql = "insert into feed_live_games (season, game_id) VALUES (?, ?)"
         cur.execute(sql, (season, game_id))
-        connection.commit()
-        cur.close()
         logging.debug(f"all_keys: {all_keys}")
         logging.debug("all_plays: " + str(game_feed_live["liveData"]["plays"].keys()))
         # raise Exception("Unhandled insert")
+    connection.commit()
     cur.close()
 
 
-def create_table_feed_live_games(all_keys, connection, default_columns):
+def get_default_columns(game_id, season):
+    default_columns = {
+        "season": season,
+        "game_id": game_id
+    }
+    return default_columns
+
+
+def create_table_feed_live_games(all_keys, default_columns):
+    connection = utils.get_db_connection(SQLITE_FILE_PATH)
     all_keys_with_default_columns = list(default_columns.keys()) + list(all_keys)
-    create_table_columns = ",\n".join([x.replace('\'', '') for x in all_keys_with_default_columns])
+
+    column_constraints = {
+        "season": "NOT NULL",
+        "game_id": "NOT NULL"
+    }
+
+    columns_with_constraints = [x + " " + column_constraints.get(x, "") for x in all_keys_with_default_columns]
+
+    create_table_columns = ",\n".join([x.replace('\'', '') for x in columns_with_constraints])
     create_table_sql = f"""
         create table if not exists feed_live_games({create_table_columns},
-                                                   PRIMARY KEY(season, game_id, about_eventId))
+                                                   PRIMARY KEY(season, game_id, about_eventId)
+    )
     """
+    logging.info(f"Creating table: {create_table_sql}")
+
     cur = connection.cursor()
     cur.execute(create_table_sql)
 
 
 if __name__ == "__main__":
-    get_all_game_feed_lives(season_from=2022)
+    get_all_game_feed_lives(season_from=1917, season_to=2022)
 
 # def db_init(connection):
 #     if init_db:

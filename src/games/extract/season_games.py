@@ -68,9 +68,9 @@ class SeasonGames:
             for games in dates["games"]:
                 game_id = games["gamePk"]
                 abstract_game_state = games["status"]["abstractGameState"]
-                result[game_id] = abstract_game_state
+                result[game_id] = (abstract_game_state, self.season)
         self.map_game_id__state = result
-        logging.debug(f"Number of games for season = {len(result)}")
+        logging.info(f"Number of games for season = {len(result)}")
         return self.map_game_id__state
 
 
@@ -78,7 +78,7 @@ def get_all_games():
     for season in range(SEASON_FROM, SEASON_TO + 1):
         season_games = SeasonGames(season)
         season_games.get()
-        season_games.get_game_ids_with_state()
+        yield season_games.get_game_ids_with_state()
 
 
 def get_latest_season():
