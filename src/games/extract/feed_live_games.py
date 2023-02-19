@@ -1,6 +1,7 @@
 import pickle
 from os.path import exists
 import json
+from sqlite3 import Error
 
 import typing
 from flatten_json import flatten
@@ -16,8 +17,6 @@ CALL_COUNT = 0
 
 
 class GameFeedLive:
-    # TODO: Pass in abstractGameState from the SeasonGames responses;
-    #  if state == 'Final' write to cache else expire immediately
     def __init__(self, game_id, abstract_game_state_current = None):
         self.game_id = game_id
         self.abstract_game_state = abstract_game_state_current
@@ -50,7 +49,7 @@ def get_all_game_feed_lives(season_from=None, season_to=None):
     @param season_to:
     @return:
     """
-    season_from = season_from or get_latest_season()
+    season_from = season_from or get_most_recent_saved_season()
     season_to = season_to or get_latest_season()
     seasons = range(season_from, season_to + 1)
     logging.debug(f"seasons: {seasons}")
@@ -72,17 +71,29 @@ def get_game_ids_to_refresh(season):
     season_games_obj = SeasonGames(season)
     season_games_obj.get()
     game_ids_to_refresh = season_games_obj.get_game_ids_with_state()
+    logging.info(game_ids_to_refresh)
 
-    if not FULL_REFRESH:
-        game_ids_to_refresh = [
-            (g, v[0], v[1]) for g, v in game_ids_to_refresh.items() if v[0] != 'Preview'
+    if FULL_REFRESH:
+        game_ids_to_refresh_with_season = [
+            (g, a[0], a[1]) for g, a in game_ids_to_refresh.items()
+        ]
+    else:
+        game_ids_to_refresh_with_season = [
+            (g, a[0], a[1]) for g, a in game_ids_to_refresh.items() if a[0] != 'Preview'
         ]
 
-    return game_ids_to_refresh
+    logging.info(
+        f"At game_ids_to_refresh: {game_ids_to_refresh_with_season},\n"
+        f"type: {type(game_ids_to_refresh_with_season)}"
+    )
+
+    return game_ids_to_refresh_with_season
 
 
 def get_data_for_single_game_id(game_ids_with_season):
     game_id, abstract_game_state, season = game_ids_with_season
+    # TODO: How to handle for an API cache being saved with a db write failure after?
+    #  Any way to rollback or expire the entire transaction, maybe with a try/catch?
     game_feed_live_obj = GameFeedLive(game_id=game_id, abstract_game_state_current=abstract_game_state)
     game_feed_live_obj.get()
     logging.debug(f"Game id is {game_id}; game_feed_live_obj.abstract_game_state is {game_feed_live_obj.abstract_game_state}")
@@ -133,6 +144,18 @@ def get_all_plays_keys(game_feed_live):
     return all_keys_sorted
 
 
+def get_most_recent_saved_season():
+    connection = utils.get_db_connection(SQLITE_FILE_PATH)
+    cur = connection.cursor()
+    try:
+        cur.execute("SELECT max(season) from feed_live_games")
+        return cur.fetchone()[0]
+    except Error:
+        return SeasonGames.STARTING_SEASON
+    finally:
+        connection.close()
+
+
 def write_to_db(season, game_id, all_keys, game_feed_live: typing.Dict[str, typing.Any]):
 
     default_columns = get_default_columns(game_id, season)
@@ -161,14 +184,15 @@ def write_to_db(season, game_id, all_keys, game_feed_live: typing.Dict[str, typi
             """
             cur.execute(query, row_flattened)
     else:
+        # Some games randomly do not have data in the allPlays list
+        #  Example: https://statsapi.web.nhl.com/api/v1/game/2019010107/feed/live
         logging.debug("No data; inserting placeholder")
-        sql = "insert into feed_live_games (season, game_id) VALUES (?, ?)"
+        sql = "INSERT OR REPLACE INTO feed_live_games (season, game_id) VALUES (?, ?)"
         cur.execute(sql, (season, game_id))
         logging.debug(f"all_keys: {all_keys}")
         logging.debug("all_plays: " + str(game_feed_live["liveData"]["plays"].keys()))
-        # raise Exception("Unhandled insert")
     connection.commit()
-    cur.close()
+    connection.close()
 
 
 def get_default_columns(game_id, season):
@@ -200,10 +224,15 @@ def create_table_feed_live_games(all_keys, default_columns):
 
     cur = connection.cursor()
     cur.execute(create_table_sql)
+    connection.close()
 
 
 if __name__ == "__main__":
-    get_all_game_feed_lives(season_from=1917, season_to=2022)
+    # import cProfile
+
+    # cProfile.run('get_all_game_feed_lives(season_from=1996, season_to=2022)')
+
+    get_all_game_feed_lives(season_to=2022)
 
 # def db_init(connection):
 #     if init_db:

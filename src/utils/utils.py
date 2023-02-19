@@ -128,4 +128,6 @@ def call_endpoint(endpoint, invalidate_cache=False, ttl_seconds=None):
 
 def get_db_connection(db_file_path):
     logging.debug(f"Opening sqlite db file at {db_file_path}")
-    return sqlite3.connect(db_file_path)
+    conn = sqlite3.connect(db_file_path)
+    conn.execute('pragma journal_mode=wal')
+    return conn

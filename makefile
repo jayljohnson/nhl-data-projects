@@ -1,44 +1,14 @@
 all:
 
-load_db: up
-	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "mkdir -p data/outputs/sqlite && \
-	rm -f data/outputs/sqlite/nhl.db || true && \
-	csvs-to-sqlite \
-		data/outputs/feed-live/feed-live.csv \
-		data/outputs/analysis/game_results.csv \
-		data/outputs/analysis/season_results.csv \
-		data/outputs/sqlite/nhl.db"
 
-load_db_old: up
-	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "mkdir -p data/outputs/sqlite && \
-	rm -f data/outputs/sqlite/nhl.db || true && \
-	csvs-to-sqlite \
-		data/outputs/feed-live/feed-live.csv \
-		# data/outputs/feed-live/game-roster-feed-live.csv \
-		# data/outputs/feed-live/game-summary-feed-live.csv \
-		# data/outputs/shift-charts/shift-charts.csv \
-		data/outputs/analysis/game_results.csv \
-		data/outputs/analysis/season_results.csv \
-		data/outputs/sqlite/nhl.db"
-
-load_db_feed_live:
-	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "mkdir -p data/outputs/sqlite && \
-	rm -f data/outputs/sqlite/nhl.db || true && \
-	pwd && \
-	csvs-to-sqlite \
-		data/outputs/feed-live/feed-live.csv \
-		data/outputs/sqlite/nhl-feed-live.db"
 
 ### GAMES ###
-get_games:
+get_games: up
 	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.games.extract.season_games"
 
 ### FEED LIVE ###
-get_feed_live:
+get_feed_live: up
 	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.games.extract.feed_live_games"
-
-transform_feed_live:
-	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.feed_live.transform_feed_live_to_csv"
 
 transform_feed_live_rosters:
 	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "python -m src.feed_live.transform_feed_live_rosters_to_csv"
@@ -50,17 +20,14 @@ datasette:
 	datasette data/outputs/sqlite/nhl-feed-live.db --setting sql_time_limit_ms 20000
 
 fly_deploy:
-	datasette publish fly data/outputs/sqlite/nhl.db \
-		--app="nhl-data-projects" \
-		--create-volume 2 \
-		--volume-name vol1 \
-		--static vol1:data/outputs/test/ \
+	time datasette publish fly data/raw/feed-live-db/game_feed_live.db \
+		--app="biscuitbarn" \
 		--install datasette-saved-queries \
 		--setting sql_time_limit_ms 25000
 		# --setting allow_download off  # TODO: Bugfix needed for bools
 
 fly_deploy_incremental:
-	# Placeholder
+	# Placeholder -
 
 fly_cli:
 	 	nhl-data-projects
@@ -120,3 +87,26 @@ benchmark:
 	rm load_test_random.data
 	time head -c 10G < /dev/urandom > /var/local/load_test_random.data
 	rm load_test_random.data > /var/local/load_test_random.data
+
+
+# DEPRECATED - for reference but not used anymore because direct writes to db instead of csv
+load_db: up
+	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "mkdir -p data/outputs/sqlite && \
+	rm -f data/outputs/sqlite/nhl.db || true && \
+	csvs-to-sqlite \
+		data/outputs/feed-live/feed-live.csv \
+		data/outputs/analysis/game_results.csv \
+		data/outputs/analysis/season_results.csv \
+		data/outputs/sqlite/nhl.db"
+
+load_db_old: up
+	time docker exec -ti  ${DOCKER_IMAGE_PREFIX}_application_1 sh -c "mkdir -p data/outputs/sqlite && \
+	rm -f data/outputs/sqlite/nhl.db || true && \
+	csvs-to-sqlite \
+		data/outputs/feed-live/feed-live.csv \
+		# data/outputs/feed-live/game-roster-feed-live.csv \
+		# data/outputs/feed-live/game-summary-feed-live.csv \
+		# data/outputs/shift-charts/shift-charts.csv \
+		data/outputs/analysis/game_results.csv \
+		data/outputs/analysis/season_results.csv \
+		data/outputs/sqlite/nhl.db"
