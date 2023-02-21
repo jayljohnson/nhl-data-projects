@@ -19,7 +19,7 @@ transform_shift_charts:
 datasette:
 	datasette data/outputs/sqlite/nhl-feed-live.db --setting sql_time_limit_ms 20000
 
-fly_deploy:
+fly_deploy: get_feed_live
 	time datasette publish fly data/raw/feed-live-db/game_feed_live.db \
 		--app="biscuitbarn" \
 		--install datasette-saved-queries \

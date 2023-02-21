@@ -1,5 +1,10 @@
-from src.utils import utils
+from os.path import exists
+import typing
 import logging
+
+from flatten_json import flatten
+
+from src.utils import utils
 
 """
 TODO list
@@ -30,9 +35,11 @@ TODO list
         UI is the calendar entry.
 """
 
+DATASET_NAME = "season_games"
 # WARNING - Setting invalidate_cache ignores the database cache and refreshes all data from the api
 #           For all games this takes a couple minutes and is okay.  Be careful with larger datasets.
-invalidate_cache = False
+all_expire_immediately = False
+scan_keys = True
 
 # PARAMS
 SEASON_FROM = 1917
@@ -54,8 +61,8 @@ class SeasonGames:
         season_year_end = self.season + 1
         logging.debug(f"Getting game info for season `{self.season}-{season_year_end}`")
         endpoint = f"https://statsapi.web.nhl.com/api/v1/schedule?season={self.season}{season_year_end}"
-        if invalidate_cache or self.is_current_season:
-            response, status_code, _ = utils.call_endpoint(endpoint, invalidate_cache=True)
+        if all_expire_immediately or self.is_current_season:
+            response, status_code, _ = utils.call_endpoint(endpoint, expire_immediately=True)
         else:
             response, status_code, _ = utils.call_endpoint(endpoint)
         logging.debug(f"get games api status_code for season {self.season} is: {status_code}")
@@ -65,20 +72,61 @@ class SeasonGames:
     def get_game_ids_with_state(self):
         result = {}
         for dates in self.data["dates"]:
-            for games in dates["games"]:
-                game_id = games["gamePk"]
-                abstract_game_state = games["status"]["abstractGameState"]
+            for game in dates["games"]:
+                game_id = game["gamePk"]
+                abstract_game_state = game["status"]["abstractGameState"]
                 result[game_id] = (abstract_game_state, self.season)
         self.map_game_id__state = result
         logging.info(f"Number of games for season = {len(result)}")
         return self.map_game_id__state
 
+    def get_game_data(self):
+        for dates in self.data["dates"]:
+            for game in dates["games"]:
+                game["season"] = self.season
+                yield game
 
-def get_all_games():
-    for season in range(SEASON_FROM, SEASON_TO + 1):
-        season_games = SeasonGames(season)
-        season_games.get()
-        yield season_games.get_game_ids_with_state()
+
+def insert_season_game(game_data: typing.Dict[str, typing.Any], cursor):
+
+    row_flattened = flatten(game_data)
+    logging.info(f"game_id: {row_flattened['gamePk']}, number of records in game_data: {len(game_data)}")
+    insert_colname_strings = ", ".join([f"{x}" for x in row_flattened.keys()])
+    insert_placeholder_strings = ", ".join([f":{x}" for x in row_flattened.keys()])
+    logging.debug(f"row_flattened length: {len(row_flattened)}")
+    query = f"""
+        INSERT OR REPLACE INTO {DATASET_NAME}
+        ({insert_colname_strings})
+        VALUES({insert_placeholder_strings})
+    """
+    cursor.execute(query, row_flattened)
+
+
+def get_all_game_keys():
+    all_game_keys = set()
+    file_path_all_keys = f"{utils.DATA_FILE_PATH_OUTPUT}/{DATASET_NAME}_all_keys.csv"
+
+    connection = utils.get_db_connection()
+    cursor = connection.cursor()
+
+    if scan_keys or not exists(file_path_all_keys):
+        for season in range(SEASON_FROM, SEASON_TO + 1):
+            cursor.execute("BEGIN")
+            season_games = SeasonGames(season)
+            season_games.get()
+            for game in season_games.get_game_data():
+                all_game_keys.update(flatten(game))
+                # TODO: Decouple the scanning from the inserts and trigger from the main feed_live_games calls
+                insert_season_game(game_data=game, cursor=cursor)
+            connection.commit()
+        with open(file_path_all_keys, 'w') as f:
+            f.write("\n".join(all_game_keys))
+            logging.info(f"at get_all_keys read: {all_game_keys}")
+    else:
+        with open(file_path_all_keys, 'r') as f:
+            all_game_keys = f.read().split("\n")
+    logging.info(f"All game keys: {all_game_keys}")
+    return sorted(all_game_keys)
 
 
 def get_latest_season():
@@ -91,83 +139,6 @@ def get_latest_season():
 
 
 if __name__ == "__main__":
-    get_all_games()
-
-
-# def get_db_connection():
-#     sqlite_file_path = f"{utils.DATA_FILE_PATH_RAW}/games/"
-#     sqlite_file_name = "games.db"
-#     if not exists(sqlite_file_path):
-#         makedirs(sqlite_file_path)
-#     print(f"Opening sqlite db file at {sqlite_file_path}")
-#     print(f"Establishing sqlite connection")
-#     return sqlite3.connect(sqlite_file_path + sqlite_file_name)
-
-
-# def db_init(connection, table_name):
-#     cur = connection.cursor()
-#     cur.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
-#     if not cur.fetchone() or init_db:
-#         print(f"Dropping and recreating the databse table {table_name}")
-#         cur.execute(f"DROP TABLE if exists {table_name}")
-#         cur.execute(f"""
-#             CREATE TABLE if not exists {table_name} (
-#                 season,
-#                 as_of_timestamp,
-#                 details,
-#                 UNIQUE(season, as_of_timestamp) ON CONFLICT REPLACE
-#             )
-#         """)
-#
-
-# def write_to_db(connection, table_name, identifier, response):
-#     if load_db:
-#         print("Writing to database")
-#         cur = connection.cursor()
-#         data = [
-#             (identifier, datetime.now(), json.dumps(response))
-#         ]
-#         cur.executemany(
-#             f"INSERT INTO {table_name} VALUES(?, ?, ?)", data,
-#         )
-#         connection.commit()
-
-
-# def read_season_from_db(connection, table_name, season):
-#     print(f"Reading from database for season {season}")
-#     cur = connection.cursor()
-#     cur.execute(
-#         f"SELECT details FROM {table_name} WHERE season = ? order by as_of_timestamp desc limit 1", [season]
-#     )
-#
-#     results = cur.fetchone()
-#     if results:
-#         # print(results)
-#         print("Database record found")
-#         return json.loads(results[0])
-#     else:
-#         print("No database record found")
-#         return None
-
-
-# def read_season_counts_from_db(connection, table_name):
-#     cur = connection.cursor()
-#     cur.execute(
-#         f"""
-#         SELECT
-#             season,
-#             count(as_of_timestamp) as as_of_timestamp_count
-#         FROM {table_name}
-#         GROUP BY 1
-#         ORDER BY 1 desc
-#         """
-#     )
-#
-#     # print(cur.fetchone())
-#     result = cur.fetchall()
-#     if result:
-#         print(f"Summary of database records: {result}")
-#         return result
-#     else:
-#         print("No database records found")
-#         return None
+    all_games = get_all_game_keys()
+    # TODO: This needs to be created once the first time, or if the schema changes in the future
+    utils.create_table(dataset_name=DATASET_NAME, all_keys=all_games, primary_keys=["gamePk"])

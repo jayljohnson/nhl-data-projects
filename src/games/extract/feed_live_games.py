@@ -12,7 +12,7 @@ from ..constants import RAW_FILE_PATH, OUTPUT_FILE_PATH, DATASET_NAME
 import logging
 
 FULL_REFRESH = False
-SQLITE_FILE_PATH = f"{RAW_FILE_PATH}-db/game_feed_live.db"
+SQLITE_FILE_PATH = f"{utils.DATA_FILE_PATH_OUTPUT}/nhl-data.db"
 CALL_COUNT = 0
 
 
@@ -36,7 +36,7 @@ class GameFeedLive:
             self.data, status, self.is_cached = utils.call_endpoint(self.endpoint)
         else:
             logging.info(f"Invalidating cache for game_id {self.game_id}, game_state {self.abstract_game_state}")
-            self.data, _, self.is_cached = utils.call_endpoint(self.endpoint, invalidate_cache=True)
+            self.data, _, self.is_cached = utils.call_endpoint(self.endpoint, expire_immediately=True)
         self.abstract_game_state = self.data["gameData"]["status"]["abstractGameState"]
         logging.debug(f"Game status: {self.abstract_game_state}")
 
@@ -156,6 +156,18 @@ def get_most_recent_saved_season():
         connection.close()
 
 
+def get_db_game_ids():
+    connection = utils.get_db_connection(SQLITE_FILE_PATH)
+    cur = connection.cursor()
+    try:
+        cur.execute("SELECT max(season) from feed_live_games")
+        return cur.fetchone()[0]
+    except Error:
+        return SeasonGames.STARTING_SEASON
+    finally:
+        connection.close()
+
+
 def write_to_db(season, game_id, all_keys, game_feed_live: typing.Dict[str, typing.Any]):
 
     default_columns = get_default_columns(game_id, season)
@@ -205,7 +217,7 @@ def get_default_columns(game_id, season):
 
 def create_table_feed_live_games(all_keys, default_columns):
     connection = utils.get_db_connection(SQLITE_FILE_PATH)
-    all_keys_with_default_columns = list(default_columns.keys()) + list(all_keys)
+    all_keys_with_default_columns = list(all_keys) + list(default_columns.keys())
 
     column_constraints = {
         "season": "NOT NULL",
@@ -224,6 +236,15 @@ def create_table_feed_live_games(all_keys, default_columns):
 
     cur = connection.cursor()
     cur.execute(create_table_sql)
+
+    # Create indices
+    cur.execute("CREATE INDEX if not exists feed_live_games__game_id on feed_live_games(game_id)")
+    cur.execute("CREATE INDEX if not exists feed_live_games__season on feed_live_games(season)")
+    cur.execute("CREATE INDEX if not exists feed_live_games__season__game_id on feed_live_games(season, game_id)")
+
+    #     cursor.execute("CREATE INDEX if not exists game_feed_live__game_id on game_feed_live(game_id)")
+
+    # cur.execute("VACUUM")
     connection.close()
 
 
