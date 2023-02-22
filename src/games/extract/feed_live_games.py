@@ -8,7 +8,7 @@ from flatten_json import flatten
 
 from src.utils import utils
 from .season_games import SeasonGames, get_latest_season
-from ..constants import RAW_FILE_PATH, OUTPUT_FILE_PATH, DATASET_NAME
+from ..constants import OUTPUT_FILE_PATH, DATASET_NAME
 import logging
 
 FULL_REFRESH = False
@@ -58,6 +58,7 @@ def get_all_game_feed_lives(season_from=None, season_to=None):
         game_ids_with_season = get_game_ids_to_refresh(season)
         logging.debug(f"at game_ids_to_refresh: {list(game_ids_with_season)}")
 
+        # TODO: If cursor transaction starts here and ends outside of the loop what's the performance benefit?
         for game_info in game_ids_with_season:
             game_data = get_data_for_single_game_id(game_info)
             logging.debug(f"at game_data: {game_data}")
@@ -149,8 +150,9 @@ def get_most_recent_saved_season():
     cur = connection.cursor()
     try:
         cur.execute("SELECT max(season) from feed_live_games")
-        return cur.fetchone()[0]
+        return cur.fetchone()[0] or SeasonGames.STARTING_SEASON
     except Error:
+        # Handling for first run when the feed_live_games table does not exist
         return SeasonGames.STARTING_SEASON
     finally:
         connection.close()
@@ -175,6 +177,7 @@ def write_to_db(season, game_id, all_keys, game_feed_live: typing.Dict[str, typi
     connection = utils.get_db_connection(SQLITE_FILE_PATH)
     cur = connection.cursor()
     cur.execute("BEGIN")
+
     all_plays = game_feed_live["liveData"]["plays"]["allPlays"]
     logging.info(f"game_id: {game_id}, number of records in all_plays: {len(all_plays)}")
     if all_plays:
@@ -227,6 +230,7 @@ def create_table_feed_live_games(all_keys, default_columns):
     columns_with_constraints = [x + " " + column_constraints.get(x, "") for x in all_keys_with_default_columns]
 
     create_table_columns = ",\n".join([x.replace('\'', '') for x in columns_with_constraints])
+    # TODO: season not needed in primary key.  Game_id identifies the season already.
     create_table_sql = f"""
         create table if not exists feed_live_games({create_table_columns},
                                                    PRIMARY KEY(season, game_id, about_eventId)

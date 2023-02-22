@@ -17,7 +17,7 @@ TODO list
 
 # Incremental
 1. [done] Get the active season's data
-1. Get the mapping of game_id to status for the active season from the cache
+1. [done] Get the mapping of game_id to status for the active season from the cache
 1. For each game_id 
     1. Get the feed-live api result for the game_id, with expires set to Never
         1. if status != 'Final':
@@ -36,12 +36,9 @@ TODO list
 """
 
 DATASET_NAME = "season_games"
-# WARNING - Setting invalidate_cache ignores the database cache and refreshes all data from the api
-#           For all games this takes a couple minutes and is okay.  Be careful with larger datasets.
-all_expire_immediately = False
-scan_keys = True
 
 # PARAMS
+scan_keys = True
 SEASON_FROM = 1917
 SEASON_TO = 2022
 
@@ -61,21 +58,32 @@ class SeasonGames:
         season_year_end = self.season + 1
         logging.debug(f"Getting game info for season `{self.season}-{season_year_end}`")
         endpoint = f"https://statsapi.web.nhl.com/api/v1/schedule?season={self.season}{season_year_end}"
-        if all_expire_immediately or self.is_current_season:
-            response, status_code, _ = utils.call_endpoint(endpoint, expire_immediately=True)
+        if self.is_current_season:
+            response, status_code, _ = utils.call_endpoint(endpoint, ttl_seconds=60 * 10)
         else:
             response, status_code, _ = utils.call_endpoint(endpoint)
         logging.debug(f"get games api status_code for season {self.season} is: {status_code}")
         self.data = response
+
+        self._insert_all_games()
+
         return self.data
+
+    def _insert_all_games(self) -> None:
+        connection = utils.get_db_connection()
+        cursor = connection.cursor()
+        cursor.execute("BEGIN")
+        for game in self.get_game_data():
+            insert_season_game(game_data=game, cursor=cursor)
+        connection.commit()
+        connection.close()
 
     def get_game_ids_with_state(self):
         result = {}
-        for dates in self.data["dates"]:
-            for game in dates["games"]:
-                game_id = game["gamePk"]
-                abstract_game_state = game["status"]["abstractGameState"]
-                result[game_id] = (abstract_game_state, self.season)
+        for game in self.get_game_data():
+            game_id = game["gamePk"]
+            abstract_game_state = game["status"]["abstractGameState"]
+            result[game_id] = (abstract_game_state, self.season)
         self.map_game_id__state = result
         logging.info(f"Number of games for season = {len(result)}")
         return self.map_game_id__state
@@ -106,19 +114,12 @@ def get_all_game_keys():
     all_game_keys = set()
     file_path_all_keys = f"{utils.DATA_FILE_PATH_OUTPUT}/{DATASET_NAME}_all_keys.csv"
 
-    connection = utils.get_db_connection()
-    cursor = connection.cursor()
-
     if scan_keys or not exists(file_path_all_keys):
         for season in range(SEASON_FROM, SEASON_TO + 1):
-            cursor.execute("BEGIN")
             season_games = SeasonGames(season)
             season_games.get()
             for game in season_games.get_game_data():
                 all_game_keys.update(flatten(game))
-                # TODO: Decouple the scanning from the inserts and trigger from the main feed_live_games calls
-                insert_season_game(game_data=game, cursor=cursor)
-            connection.commit()
         with open(file_path_all_keys, 'w') as f:
             f.write("\n".join(all_game_keys))
             logging.info(f"at get_all_keys read: {all_game_keys}")

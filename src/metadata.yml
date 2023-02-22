@@ -1,12 +1,11 @@
 nhl_data_projects:
-  - feed_live:
-      - feed_live:
+  - games:
+      - constants:
           description: Constants file.  TODO- Rename file to constants.py
-      - get_feed_live:
+      - extract/season_games:
           description:  http api requests, saved to a pickle file for each game
-      - transform_feed_live_to_csv:
-          description: Gets the 'feed live' pickle files and transforms them to flattened csv
-          benchmark_time: '12:24.19'
+      - extract/feed_live_games:
+          description:  http api requests, saved to a pickle file for each game
       - transform_feed_live_rosters_to_csv:
           description: TODO
   - linescore:
